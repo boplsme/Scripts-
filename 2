@@ -1,0 +1,12 @@
+-- Проверка правильного лоадстринга
+local allowedUrl = "https://raw.githubusercontent.com/boplsme/Scripts-/refs/heads/main/1"
+
+-- Получаем инфу о функции, которая вызвала loadstring
+local info = debug.getinfo(2, "S")
+if not info or not info.source or not info.source:find(allowedUrl) then
+    warn("❌ Wrong loader detected! This script will not run.")
+    return -- скрипт останавливается
+end
+
+-- Далее идёт твой обычный скрипт
+print("✅ Correct loader detected. Script is running...")
