@@ -1,0 +1,15 @@
+-- В лоадстринге:
+local allowedUrl = "https://raw.githubusercontent.com/boplsme/Scripts-/refs/heads/main/1"
+
+-- Передача ключа в скрипт:
+loadstring(game:HttpGet("https://raw.githubusercontent.com/boplsme/Scripts-/refs/heads/main/1"))()(allowedUrl)
+
+-- Внутри скрипта
+return function(loaderUrl)
+    if loaderUrl ~= "https://raw.githubusercontent.com/boplsme/Scripts-/refs/heads/main/1" then
+        warn("❌ Wrong loader! Script stopped.")
+        return
+    end
+    print("✅ Correct loader! Script running...")
+    -- здесь основной код скрипта
+end
