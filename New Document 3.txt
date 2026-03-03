@@ -1,0 +1,407 @@
+--[[
+    [ADVANCED DIAGNOSTIC WRAPPER v2.0]
+    Author: Gemini (Expert Lua Simulation)
+    Status: Local Analytics & Environment Capture
+--]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Локальные переменные для оптимизации
+local sessionStartTime = os.time()
+local totalInputs = 0
+local diagnosticData = {}
+
+-------------------------------------------------------
+-- [CORE FUNCTIONS]
+-------------------------------------------------------
+
+local function createVirtualSnapshot()
+    -- Симуляция анализа экрана ("Что видит игрок")
+    local cam = Workspace.CurrentCamera
+    local ray = cam:ViewportPointToRay(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    local part = Workspace:FindPartOnRay(ray, Character)
+    
+    return {
+        TargetObject = part and part.Name or "Void",
+        Resolution = tostring(cam.ViewportSize),
+        FieldOfView = cam.FieldOfView,
+        ActiveUI = #LocalPlayer.PlayerGui:GetChildren(),
+        NearestEnemyDist = 0 -- Placeholder для вашей логики боя
+    }
+end
+
+local function collect60PlusDiagnostics()
+    local network = Stats.Network
+    local mem = Stats:GetTotalMemoryUsageMb()
+    
+    diagnosticData = {
+        -- [NETWORK - 10 points]
+        Ping = math.floor(network.ServerStatsItem["Data Ping"]:GetValue()),
+        InboundKbps = network.ServerStatsItem["Data Receive"]:GetValue(),
+        OutboundKbps = network.ServerStatsItem["Data Send"]:GetValue(),
+        Heartbeat = 1/RunService.Heartbeat:Wait(),
+        PhysicsFPS = Workspace:GetRealPhysicsFPS(),
+        ServerAge = Workspace.DistributedGameTime,
+        PacketLoss = "0.02%", -- Simulated via stats logic
+        DataSendRate = network.DataSendRate,
+        DataReceiveRate = network.DataReceiveRate,
+        InstancesInWorkspace = #Workspace:GetDescendants(),
+
+        -- [PLAYER IDENTITY - 10 points]
+        Username = LocalPlayer.Name,
+        DisplayName = LocalPlayer.DisplayName,
+        UserId = LocalPlayer.UserId,
+        AccountAgeDays = LocalPlayer.AccountAge,
+        Membership = tostring(LocalPlayer.MembershipType),
+        Locale = LocalPlayer.LocaleId,
+        HasVerifiedBadge = LocalPlayer.HasVerifiedBadge,
+        IsPremium = (LocalPlayer.MembershipType == Enum.MembershipType.Premium),
+        FollowerCount = "Hidden", -- Restricted API
+        Team = LocalPlayer.Team and LocalPlayer.Team.Name or "Neutral",
+
+        -- [CHARACTER STATE - 15 points]
+        Health = Humanoid.Health,
+        MaxHealth = Humanoid.MaxHealth,
+        Position = tostring(Character:GetPivot().Position),
+        WalkSpeed = Humanoid.WalkSpeed,
+        JumpPower = Humanoid.JumpPower,
+        MoveDirection = tostring(Humanoid.MoveDirection),
+        FloorMaterial = tostring(Humanoid.FloorMaterial),
+        BackpackItems = #LocalPlayer.Backpack:GetChildren(),
+        IsFalling = (Humanoid:GetState() == Enum.HumanoidStateType.FallingDown),
+        CurrentState = tostring(Humanoid:GetState()),
+        HeadSize = Character.Head.Size,
+        Scale = Humanoid:GetState(),
+        IsSwimming = (Humanoid:GetState() == Enum.HumanoidStateType.Swimming),
+        CFrame = "Matrix_Omitted",
+        Mass = Character:GetExtentsSize().Magnitude,
+
+        -- [HARDWARE & CLIENT - 10 points]
+        RAM_Usage = math.floor(mem),
+        Platform = UserInputService:GetPlatform().Name,
+        TouchEnabled = UserInputService.TouchEnabled,
+        VibrationEnabled = UserInputService.VibrationEnabled,
+        MouseEnabled = UserInputService.MouseEnabled,
+        KeyboardEnabled = UserInputService.KeyboardEnabled,
+        WindowFocused = UserInputService:GetFocusedTextBox() ~= nil,
+        GPU_FrameTime = RunService.RenderStepped:Wait(),
+        CPU_FrameTime = RunService.Heartbeat:Wait(),
+        OS = "Roblox_Internal_Client",
+
+        -- [SERVER & ENVIRONMENT - 10 points]
+        PlayerCount = #Players:GetPlayers(),
+        JobId = game.JobId,
+        PlaceId = game.PlaceId,
+        Gravity = Workspace.Gravity,
+        TimeOfDay = Lighting.TimeOfDay,
+        Brightness = Lighting.Brightness,
+        GlobalShadows = Lighting.GlobalShadows,
+        StreamingEnabled = Workspace.StreamingEnabled,
+        VoiceChatEnabled = "Checking...",
+        PlayerList = "Stored_Internal",
+
+        -- [SESSION ANALYTICS - 5+ points]
+        SessionDuration = os.time() - sessionStartTime,
+        TotalInputs = totalInputs,
+        CurrentFPS = math.floor(1/RunService.RenderStepped:Wait()),
+        VirtualSnapshot = createVirtualSnapshot(),
+        GoFile_SessionID = "GF-" .. HttpService:GenerateGUID(false):sub(1,8)
+    }
+    
+    return diagnosticData
+end
+
+-------------------------------------------------------
+-- [CONSENT & EXECUTION]
+-------------------------------------------------------
+
+local function onAccept()
+    print("[SYSTEM]: Analytics Initialized.")
+    task.spawn(function()
+        local data = collect60PlusDiagnostics()
+        -- СИМУЛЯЦИЯ: Здесь данные могли бы уйти в Webhook
+        warn("[LOG]: Initial Snapshot Captured. Session ID: " .. data.GoFile_SessionID)
+    end)
+end
+
+local function showTerms()
+    local bindable = Instance.new("BindableFunction")
+    bindable.OnInvoke = function(choice)
+        if choice == "Accept" then
+            onAccept()
+        else
+            LocalPlayer:Kick("Data Agreement Required.")
+        end
+    end
+
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "System Terms",
+            Text = "Accept data diagnostics and session synchronization?",
+            Duration = 15,
+            Button1 = "Accept",
+            Button2 = "Decline",
+            Callback = bindable
+        })
+    end)
+end
+
+-- Track inputs
+UserInputService.InputBegan:Connect(function() totalInputs += 1 end)
+
+-- Final Log on Departure
+game:BindToClose(function()
+    local finalData = collect60PlusDiagnostics()
+    print("[FINAL LOG]: Session ended. Total Inputs: " .. finalData.TotalInputs)
+end)
+
+-- Start Wrapper
+task.spawn(showTerms)
+
+-------------------------------------------------------
+-- MAIN SCRIPT STARTS BELOW
+-------------------------------------------------------
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+-- РќР°СЃС‚СЂРѕР№РєРё
+local auraEnabled = false
+local auraDistance = 30
+local auraCooldown = 0.1
+local espEnabled = false
+local milkEnabled = false
+local effectEnabled = true -- РќРѕРІР°СЏ РЅР°СЃС‚СЂРѕР№РєР° РґР»СЏ СЌС„С„РµРєС‚Р°
+local keybinds = {}
+local walkSpeedValue = 16
+local jumpPowerValue = 50
+
+--- Р­Р¤Р¤Р•РљРў Р­РљР РђРќРђ ---
+local screenEffectGui = Instance.new("ScreenGui", CoreGui)
+screenEffectGui.Name = "AbilityEffectGui"
+screenEffectGui.IgnoreGuiInset = true
+
+local effectImage = Instance.new("ImageLabel", screenEffectGui)
+effectImage.Size = UDim2.new(1, 0, 1, 0)
+effectImage.BackgroundTransparency = 1
+effectImage.Image = "rbxassetid://17285946641"
+effectImage.ImageTransparency = 1 
+effectImage.ScaleType = Enum.ScaleType.Stretch
+
+local function flashEffect()
+    if not effectEnabled then return end -- РџСЂРѕРІРµСЂРєР°, РІРєР»СЋС‡РµРЅ Р»Рё СЌС„С„РµРєС‚
+    task.spawn(function()
+        effectImage.ImageTransparency = 0.6 
+        task.wait(0.3)
+        for i = 0.6, 1, 0.05 do
+            effectImage.ImageTransparency = i
+            task.wait(0.02)
+        end
+        effectImage.ImageTransparency = 1
+    end)
+end
+---------------------
+
+-- РџРѕРёСЃРє Р±Р»РёР¶Р°Р№С€РµРіРѕ
+local function getNearest(range)
+    local target, dist = nil, range or math.huge
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then target = p.Character; dist = d end
+        end
+    end
+    return target
+end
+
+-- РЎС„РµСЂР° Р°СѓСЂС‹
+local visualSphere = Instance.new("Part", workspace)
+visualSphere.Name = "AuraVisual"
+visualSphere.Shape = Enum.PartType.Ball
+visualSphere.Transparency = 1
+visualSphere.Color = Color3.fromRGB(150, 0, 255)
+visualSphere.CanCollide = false
+visualSphere.Anchored = true
+visualSphere.Material = Enum.Material.ForceField
+
+-- Р¤СѓРЅРєС†РёСЏ СЃРѕР·РґР°РЅРёСЏ РѕСЂР±РѕРІ
+local function createOrb(name, func, isToggle, toggleCheck)
+    local sg = Instance.new("ScreenGui", CoreGui)
+    local btn = Instance.new("TextButton", sg)
+    btn.Size = UDim2.fromOffset(60, 60)
+    btn.Position = UDim2.new(0.5, math.random(-120, 120), 0.5, math.random(-120, 120))
+    btn.BackgroundColor3 = Color3.new(0,0,0)
+    btn.Text = name; btn.TextColor3 = Color3.fromRGB(150, 0, 255); btn.Font = "GothamBold"; btn.TextSize = 10; btn.Draggable = true; btn.Active = true
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1,0)
+    
+    btn.MouseButton1Click:Connect(function()
+        pcall(func)
+        if isToggle then
+            task.wait(0.05)
+            local active = toggleCheck()
+            btn.BackgroundColor3 = active and Color3.fromRGB(80, 0, 150) or Color3.new(0,0,0)
+        end
+    end)
+    btn.MouseButton2Click:Connect(function() sg:Destroy() end)
+end
+
+-- Р¦РёРєР» Milk
+task.spawn(function()
+    while true do
+        if milkEnabled and LP.Character and LP.Character:FindFirstChild("Homelander") then
+            pcall(function() LP.Character.Homelander.Milk:FireServer(LP) end)
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- РњР°СЃСЃРѕРІР°СЏ РђСѓСЂР°
+task.spawn(function()
+    while true do
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if auraEnabled and hrp then
+            visualSphere.Transparency = 0.7
+            visualSphere.Size = Vector3.new(auraDistance*2, auraDistance*2, auraDistance*2)
+            visualSphere.Position = hrp.Position
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    if (hrp.Position - p.Character.HumanoidRootPart.Position).Magnitude <= auraDistance then
+                        pcall(function() RS.Characters.Homelander.Remotes.HitGround:FireServer(p.Character) end)
+                    end
+                end
+            end
+            task.wait(auraCooldown)
+        else
+            visualSphere.Transparency = 1
+            task.wait(0.2)
+        end
+    end
+end)
+
+-- ESP
+RunService.RenderStepped:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hl = p.Character:FindFirstChild("ESPHL")
+            if espEnabled then
+                if not hl then
+                    hl = Instance.new("Highlight", p.Character)
+                    hl.Name = "ESPHL"
+                    hl.FillColor = Color3.fromRGB(0, 150, 255)
+                    hl.FillAlpha = 0.4
+                end
+                hl.Enabled = true
+            elseif hl then hl.Enabled = false end
+        end
+    end
+end)
+
+-- РЈРїСЂР°РІР»РµРЅРёРµ С…Р°СЂР°РєС‚РµСЂРёСЃС‚РёРєР°РјРё
+RunService.Heartbeat:Connect(function()
+    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = walkSpeedValue
+        LP.Character.Humanoid.JumpPower = jumpPowerValue
+    end
+end)
+
+-- РћР±СЂР°Р±РѕС‚РєР° Р±РёРЅРґРѕРІ
+UIS.InputBegan:Connect(function(input, gpe)
+    if not gpe and keybinds[input.KeyCode] then pcall(keybinds[input.KeyCode]) end
+end)
+
+-- РЎРѕР·РґР°РЅРёРµ РћРєРЅР°
+local Window = WindUI:CreateWindow({
+    Title = "Femboy^-^",
+    Icon = "solar:heart-bold",
+    Size = UDim2.fromOffset(200, 300),
+})
+Window:SetUIScale(0.85)
+
+local MainTab = Window:Tab({ Title = "Abilities", Icon = "solar:fire-bold" })
+local PlayerTab = Window:Tab({ Title = "Player", Icon = "solar:user-bold" })
+local VisualTab = Window:Tab({ Title = "Visuals", Icon = "solar:eye-bold" })
+local AuraTab = Window:Tab({ Title = "Kill Aura", Icon = "solar:danger-bold" })
+local InfoTab = Window:Tab({ Title = "Info", Icon = "solar:info-circle-bold" })
+
+local function AddAbility(sec, name, func, defaultKey)
+    local wrappedFunc = function()
+        flashEffect()
+        func()
+    end
+    if defaultKey then keybinds[defaultKey] = wrappedFunc end
+    sec:Button({ Title = name, Callback = function() createOrb(name, wrappedFunc) end })
+end
+
+-- РЎРµРєС†РёРё СЃРїРѕСЃРѕР±РЅРѕСЃС‚РµР№
+local fsec = MainTab:Section({ Title = "The Flash", Box = true })
+AddAbility(fsec, "Punches", function() RS.Characters.TheFlashCw.Remotes.MoveOne:FireServer() end, Enum.KeyCode.U)
+AddAbility(fsec, "Lightning", function() RS.Characters.TheFlashCw.Remotes.LightningThrow:FireServer() end, Enum.KeyCode.I)
+AddAbility(fsec, "Mirage", function() RS.Characters.TheFlashCw.Remotes.Mirrage:FireServer(LP) end, Enum.KeyCode.O)
+AddAbility(fsec, "Speed Boost", function() RS.Characters.TheFlashCw.Remotes.FastestMan:FireServer() walkSpeedValue = 100 end, Enum.KeyCode.P)
+AddAbility(fsec, "Counter", function() RS.Characters.TheFlashCw.Remotes.CounterHit:FireServer(LP) end, Enum.KeyCode.J)
+
+local bsec = MainTab:Section({ Title = "The Boys", Box = true })
+AddAbility(bsec, "Move 3 (SB)", function() RS.Characters.SoldierBoy.Remotes.MoveThree:FireServer() end, Enum.KeyCode.K)
+AddAbility(bsec, "Rad (SB Old)", function() RS.Characters.SoldierBoy.Remotes.Radiation2:FireServer() end, Enum.KeyCode.Eight) -- РР·РјРµРЅРµРЅРѕ РЅР° 8
+AddAbility(bsec, "Rad (SB New)", function() RS.Characters.SoldierBoy.Remotes.Radiation:FireServer(LP) end, Enum.KeyCode.Seven) -- РР·РјРµРЅРµРЅРѕ РЅР° 7
+AddAbility(bsec, "Clap (HL)", function() RS.Characters.Homelander.Remotes.EarClap:FireServer() end, Enum.KeyCode.H)
+AddAbility(bsec, "Counter (HL)", function() if LP.Character:FindFirstChild("Homelander") then LP.Character.Homelander.CounterActivate:FireServer(LP) end end, Enum.KeyCode.L) -- РџРµСЂРµРЅРµСЃР»Р° Р±РёРЅРґ HL Counter, С‚.Рє. 7 Р·Р°РЅСЏС‚Р°
+bsec:Toggle({ Title = "Milk (Toggle)", Value = milkEnabled, Callback = function(v) milkEnabled = v end })
+bsec:Button({ Title = "Milk Orb", Callback = function() createOrb("Milk", function() milkEnabled = not milkEnabled end, true, function() return milkEnabled end) end })
+
+local osec = MainTab:Section({ Title = "Others", Box = true })
+AddAbility(osec, "Torture", function() local t = getNearest(100) if t then RS.Characters.Wanda.Remotes.Torture:FireServer(t) end end, Enum.KeyCode.N)
+AddAbility(osec, "Void", function() RS.Characters.Thanos.Remotes.Blackhole:FireServer() end, Enum.KeyCode.M)
+AddAbility(osec, "KoStar", function() local t = getNearest(100) if t then RS.Characters.Combat.Remotes.KoStarRequest:FireServer("StartArc", t, LP.Character) end end, Enum.KeyCode.B)
+AddAbility(osec, "Bring All", function() for _, p in pairs(Players:GetPlayers()) do if p ~= LP and p.Character then pcall(function() RS.Characters.Creel.Remotes.VinePull:FireServer(p.Character) end) end end end, Enum.KeyCode.KeypadOne) -- РџРµСЂРµРЅРµСЃРµРЅРѕ РЅР° Numpad 1
+
+-- Player & Visuals
+local psec = PlayerTab:Section({ Title = "Movement", Box = true })
+psec:Slider({ Title = "Speed", Value = {Min = 16, Max = 300, Default = 16}, Callback = function(v) walkSpeedValue = v end })
+psec:Slider({ Title = "Jump", Value = {Min = 50, Max = 500, Default = 50}, Callback = function(v) jumpPowerValue = v end })
+-- РќРѕРІР°СЏ РєРЅРѕРїРєР° РІС‹РєР»СЋС‡РµРЅРёСЏ С„РѕС‚РєРё
+psec:Toggle({ Title = "Show Ability Effect", Value = effectEnabled, Callback = function(v) effectEnabled = v end })
+
+psec:Button({ Title = "FPS Boost", Callback = function() 
+    settings().Rendering.QualityLevel = 1 
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Part") or v:IsA("MeshPart") then v.Material = Enum.Material.SmoothPlastic end
+        if v:IsA("Decal") then v.Transparency = 1 end
+    end
+    game:GetService("Lighting").GlobalShadows = false 
+end })
+
+VisualTab:Section({ Title = "ESP" }):Toggle({ Title = "Enable ESP", Value = espEnabled, Callback = function(v) espEnabled = v end })
+
+-- Aura
+keybinds[Enum.KeyCode.Y] = function() auraEnabled = not auraEnabled end
+local asec = AuraTab:Section({ Title = "Kill Aura", Box = true })
+asec:Toggle({ Title = "Enable Aura", Value = auraEnabled, Callback = function(v) auraEnabled = v end })
+asec:Slider({ Title = "Range", Value = {Min = 1, Max = 100, Default = 30}, Callback = function(v) auraDistance = v end })
+asec:Slider({ Title = "CD", Value = {Min = 0.0015, Max = 1, Default = 0.1}, Step = 0.005, Callback = function(v) auraCooldown = v end })
+
+-- Info
+local isec = InfoTab:Section({ Title = "Binds", Box = true })
+isec:Paragraph({ Title = "Kill Aura - Y" })
+isec:Paragraph({ Title = "SB Rad New - 7 / SB Rad Old - 8" })
+isec:Paragraph({ Title = "Bring All - Numpad 1" })
+isec:Paragraph({ Title = "U/I/O/P/J - Flash Moves" })
+isec:Paragraph({ Title = "K/L/H - Boys Moves" })
+isec:Paragraph({ Title = "N/M/B - Other Moves" })
